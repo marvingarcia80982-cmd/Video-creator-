@@ -1,0 +1,21 @@
+# Server
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/scenegen
+
+# AI Providers
+RUNWAY_API_KEY=your_runway_api_key_here
+LUMA_API_KEY=your_luma_api_key_here
+REPLICATE_API_TOKEN=your_replicate_token_here
+
+# AWS S3
+AWS_ACCESS_KEY_ID=your_aws_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret
+AWS_REGION=us-east-1
+S3_BUCKET_NAME=scenegen-videos
+
+# Webhooks
+RUNWAY_WEBHOOK_SECRET=your_webhook_secret_for_verification
