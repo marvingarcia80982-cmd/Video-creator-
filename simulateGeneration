@@ -1,0 +1,72 @@
+// In your HTML frontend
+const API_BASE = 'http://localhost:3000/api';
+
+async function startGeneration() {
+  const token = localStorage.getItem('token'); // From login
+  const prompt = document.getElementById('scene-input').value;
+  
+  try {
+    // Start generation
+    const response = await fetch(`${API_BASE}/videos/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        prompt,
+        duration: 5,
+        aspectRatio: '16:9',
+        style: 'Cyberpunk'
+      })
+    });
+    
+    const data = await response.json();
+    const parentSceneId = data.parentSceneId;
+    
+    // Poll for status updates
+    const pollInterval = setInterval(async () => {
+      const statusRes = await fetch(`${API_BASE}/videos/status/${parentSceneId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const statusData = await statusRes.json();
+      
+      // Update progress bar based on completed scenes
+      const completed = statusData.scenes.filter(s => s.status === 'completed').length;
+      const progress = (completed / 3) * 100;
+      
+      document.getElementById('progress-bar').style.width = `${progress}%`;
+      document.getElementById('progress-text').textContent = `${Math.round(progress)}%`;
+      document.getElementById('generation-status').textContent = 
+        `Generated ${completed} of 3 variations...`;
+      
+      if (completed === 3) {
+        clearInterval(pollInterval);
+        showResults(statusData.scenes);
+      }
+    }, 3000);
+    
+  } catch (error) {
+    console.error('Generation failed:', error);
+    alert('Failed to start generation: ' + error.message);
+  }
+}
+
+async function downloadScene(sceneId) {
+  const token = localStorage.getItem('token');
+  
+  const response = await fetch(`${API_BASE}/videos/download/${sceneId}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  
+  const data = await response.json();
+  
+  // Trigger download
+  const a = document.createElement('a');
+  a.href = data.downloadUrl;
+  a.download = `scene-${sceneId}.mp4`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
