@@ -1,0 +1,55 @@
+const express = require('express');
+const crypto = require('crypto');
+const { query } = require('../database/pool');
+const storage = require('../services/storage');
+
+const router = express.Router();
+
+// Runway webhook
+router.post('/runway', async (req, res) => {
+  const signature = req.headers['x-runway-signature'];
+  const payload = JSON.stringify(req.body);
+  
+  // Verify webhook signature
+  const expectedSignature = crypto
+    .createHmac('sha256', process.env.RUNWAY_WEBHOOK_SECRET)
+    .update(payload)
+    .digest('hex');
+    
+  if (signature !== expectedSignature) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  const { task_id, status, url } = req.body;
+  
+  // Update database
+  const result = await query(
+    'SELECT id, user_id FROM scenes WHERE provider_task_id = $1',
+    [task_id]
+  );
+  
+  if (result.rows.length > 0) {
+    const scene = result.rows[0];
+    
+    if (status === 'completed') {
+      // Transfer to S3
+      const s3Data = await storage.uploadVideoFromUrl(url, scene.user_id, scene.id);
+      
+      await query(
+        `UPDATE scenes SET status = $1, video_url = $2, completed_at = NOW(), 
+         metadata = metadata || $3 WHERE provider_task_id = $4`,
+        ['completed', s3Data.url, JSON.stringify({ s3Key: s3Data.key }), task_id]
+      );
+    } else if (status === 'failed') {
+      await query(
+        'UPDATE scenes SET status = $1 WHERE provider_task_id = $2',
+        ['failed', task_id]
+      );
+    }
+  }
+  
+  res.json({ received: true });
+});
+
+module.exports = router;
+v
